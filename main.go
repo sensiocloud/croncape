@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"bytes"
 	"flag"
 	"fmt"
@@ -20,6 +21,8 @@ type request struct {
 	emails    string
 	timeout   time.Duration
 	transport string
+	write     string
+	append    string
 	verbose   bool
 }
 
@@ -47,6 +50,8 @@ func main() {
 	flag.DurationVar(&req.timeout, "t", 0, `Timeout for the command, like "-t 2h", "-t 2m", or "-t 30s". After the timeout, the command is killed, disabled by default`)
 	flag.StringVar(&req.transport, "p", "auto", `Transport to use, like "-p auto", "-p mail", "-p sendmail"`)
 	flag.BoolVar(&req.verbose, "v", false, "Enable sending emails even if command is successful")
+	flag.StringVar(&req.write, "w", "", `write stdout to a file`)
+	flag.StringVar(&req.append, "a", "", `append stdout to a file`)
 	flag.BoolVar(&versionf, "version", false, "Output the version")
 	flag.Parse()
 
@@ -113,6 +118,25 @@ func execCmd(path string, req request) result {
 	}
 
 	r.stopped = time.Now()
+
+	if req.write != "" || req.append  != "" {
+		
+		if req.write != "" {
+			err := ioutil.WriteFile(req.write, r.stdout.Bytes(), 0644)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		} else {
+			file, err := os.OpenFile(req.append, os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			defer file.Close()
+			if _, err := file.WriteString(r.stdout.String()); err != nil {
+				log.Fatalln(err)
+			}
+		}
+	}
 
 	return r
 }
